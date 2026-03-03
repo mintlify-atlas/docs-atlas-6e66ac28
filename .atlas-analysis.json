@@ -1,0 +1,82 @@
+{
+  "projectType": "sdk-library",
+  "projectName": "Geocoder ID",
+  "projectDescription": "Offline reverse geocoding library for Indonesia with support for province, regency, district, and village-level administrative data",
+  "theme": "mint",
+  "primaryColor": "#DC143C",
+  "lightColor": null,
+  "darkColor": null,
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "installation",
+              "quickstart"
+            ]
+          },
+          {
+            "group": "Guides",
+            "pages": [
+              "guides/basic-usage",
+              "guides/batch-processing",
+              "guides/administrative-levels",
+              "guides/error-handling"
+            ]
+          },
+          {
+            "group": "CLI Tool",
+            "pages": [
+              "cli/installation",
+              "cli/usage",
+              "cli/configuration"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "API Reference",
+        "groups": [
+          {
+            "group": "Core API",
+            "pages": [
+              "api/geocoder",
+              "api/types",
+              "api/database"
+            ]
+          },
+          {
+            "group": "Examples",
+            "pages": [
+              "examples/basic",
+              "examples/batch",
+              "examples/levels"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Offline reverse geocoding without internet connection",
+    "Fast spatial indexing with O(log n) queries",
+    "Auto-download database on first use",
+    "Support for all Indonesian administrative levels (province, regency, district, village)",
+    "Dual-use as both Go library and CLI tool",
+    "Batch coordinate processing"
+  ],
+  "publicApiSurface": [
+    "NewDefault() - Initialize geocoder with auto-download",
+    "New(dbPath) - Initialize geocoder with custom database path",
+    "ReverseGeocode(lat, lon) - Convert coordinates to full address",
+    "ReverseGeocodeLevel(lat, lon, level) - Query specific administrative level",
+    "ParseCoords(string) - Parse coordinate strings",
+    "Result - Result structure with Province, Regency, District, Village",
+    "Location - Location structure with Code and Name",
+    "Level - Administrative level constants (Province, Regency, District, Village)"
+  ]
+}
