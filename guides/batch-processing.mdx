@@ -1,0 +1,185 @@
+---
+title: 'Batch Processing'
+description: 'Process multiple coordinates efficiently'
+---
+
+## Overview
+
+When you need to reverse geocode multiple coordinates, you can process them in a loop using a single geocoder instance. This is much more efficient than creating a new geocoder for each coordinate.
+
+## Basic Batch Processing
+
+Create one geocoder instance and reuse it for all coordinates:
+
+```go
+package main
+
+import (
+    "encoding/json"
+    "fmt"
+    "log"
+    "os"
+
+    geocoder "github.com/zsbahtiar/geocoder-id"
+)
+
+func main() {
+    gc, err := geocoder.NewDefault()
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer gc.Close()
+
+    coordinates := []geocoder.Coord{
+        {Lat: -6.2088, Lon: 106.8456}, // Jakarta
+        {Lat: -6.9175, Lon: 107.6191}, // Bandung
+        {Lat: -7.2575, Lon: 112.7521}, // Surabaya
+        {Lat: -8.6705, Lon: 115.2126}, // Bali
+        {Lat: -2.0498, Lon: 110.1879}, // Kalimantan Barat
+    }
+
+    var results []geocoder.Result
+    for _, coord := range coordinates {
+        result := gc.ReverseGeocode(coord.Lat, coord.Lon)
+        results = append(results, result)
+    }
+
+    enc := json.NewEncoder(os.Stdout)
+    enc.SetIndent("", "  ")
+    enc.Encode(results)
+
+    fmt.Fprintf(os.Stderr, "\nProcessed %d coordinates\n", len(coordinates))
+}
+```
+
+<Info>
+The `Coord` type is a simple struct with `Lat` and `Lon` fields, making it easy to work with coordinate pairs.
+</Info>
+
+## Coord Type
+
+```go
+type Coord struct {
+    Lat float64
+    Lon float64
+}
+```
+
+You can create slices of coordinates to process in batches.
+
+## Output Example
+
+The batch example above produces JSON output:
+
+```json
+[
+  {
+    "province": {
+      "code": "31",
+      "name": "DKI JAKARTA"
+    },
+    "regency": {
+      "code": "3171",
+      "name": "KOTA JAKARTA PUSAT"
+    },
+    "district": {
+      "code": "317104",
+      "name": "MENTENG"
+    },
+    "village": {
+      "code": "3171041006",
+      "name": "MENTENG"
+    }
+  },
+  {
+    "province": {
+      "code": "32",
+      "name": "JAWA BARAT"
+    },
+    "regency": {
+      "code": "3273",
+      "name": "KOTA BANDUNG"
+    },
+    "district": {
+      "code": "327316",
+      "name": "COBLONG"
+    },
+    "village": {
+      "code": "3273161002",
+      "name": "LEBAK GEDE"
+    }
+  }
+]
+```
+
+## Parsing Coordinate Strings
+
+Geocoder ID includes a helper function to parse coordinate strings:
+
+```go
+func ParseCoords(s string) []Coord
+```
+
+This function parses semicolon-separated coordinate pairs:
+
+```go
+coordStr := "-6.2088 106.8456; -6.9175 107.6191; -7.2575 112.7521"
+coords := geocoder.ParseCoords(coordStr)
+
+for _, coord := range coords {
+    result := gc.ReverseGeocode(coord.Lat, coord.Lon)
+    // Process result...
+}
+```
+
+<Note>
+`ParseCoords` expects coordinates in "lat lon" format, separated by semicolons. Invalid entries are silently skipped.
+</Note>
+
+## Best Practices
+
+<Tabs>
+  <Tab title="Do">
+    ```go
+    // Create geocoder once
+    gc, err := geocoder.NewDefault()
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer gc.Close()
+
+    // Reuse for all coordinates
+    for _, coord := range coordinates {
+        result := gc.ReverseGeocode(coord.Lat, coord.Lon)
+        // Process result...
+    }
+    ```
+  </Tab>
+  <Tab title="Don't">
+    ```go
+    // Don't create geocoder in loop
+    for _, coord := range coordinates {
+        gc, err := geocoder.NewDefault() // Inefficient!
+        if err != nil {
+            log.Fatal(err)
+        }
+        result := gc.ReverseGeocode(coord.Lat, coord.Lon)
+        gc.Close()
+    }
+    ```
+  </Tab>
+</Tabs>
+
+## Performance Tips
+
+1. **Single Instance**: Always reuse the same geocoder instance for batch operations
+2. **Defer Close**: Use `defer gc.Close()` to ensure cleanup happens
+3. **Pre-allocate**: If you know the result count, pre-allocate your results slice:
+   ```go
+   results := make([]geocoder.Result, 0, len(coordinates))
+   ```
+4. **Error Handling**: Results are returned even if no match is found - check for nil fields
+
+<Warning>
+Creating a new geocoder instance for each coordinate is extremely inefficient as it reopens the database connection each time.
+</Warning>

@@ -1,0 +1,301 @@
+---
+title: 'Error Handling'
+description: 'Handle errors and edge cases when using Geocoder ID'
+---
+
+## Initialization Errors
+
+Always check for errors when creating a geocoder instance:
+
+```go
+gc, err := geocoder.NewDefault()
+if err != nil {
+    log.Fatal(err)
+}
+defer gc.Close()
+```
+
+### Common Initialization Errors
+
+<Tabs>
+  <Tab title="Database Not Found">
+    ```go
+    gc, err := geocoder.New("/invalid/path/geocoder.duckdb")
+    if err != nil {
+        // Error: failed to open database: unable to open database file
+        log.Printf("Database error: %v", err)
+        return
+    }
+    ```
+    
+    **Solution**: Use `NewDefault()` for automatic database discovery/download, or verify the path exists.
+  </Tab>
+  <Tab title="Download Failure">
+    ```go
+    // NewDefault() may fail if database doesn't exist and download fails
+    gc, err := geocoder.NewDefault()
+    if err != nil {
+        // Error: failed to download database: [network error]
+        log.Printf("Initialization error: %v", err)
+        return
+    }
+    ```
+    
+    **Solution**: Ensure internet connectivity or manually place the database file in a searchable location.
+  </Tab>
+  <Tab title="Spatial Extension">
+    ```go
+    // Internal error during spatial extension load
+    gc, err := geocoder.New(dbPath)
+    if err != nil {
+        // Error: failed to load spatial extension
+        log.Printf("Extension error: %v", err)
+        return
+    }
+    ```
+    
+    **Solution**: Ensure you're using a compatible DuckDB version and the database file is not corrupted.
+  </Tab>
+</Tabs>
+
+## Handling Missing Results
+
+The `Result` type uses pointers for all fields. When a coordinate doesn't match any location, fields will be `nil`:
+
+```go
+result := gc.ReverseGeocode(lat, lon)
+
+// Always check for nil before accessing
+if result.Province == nil {
+    log.Println("Coordinate not found in database")
+    return
+}
+```
+
+### Safe Result Access Pattern
+
+<CodeGroup>
+
+```go Defensive Checking
+result := gc.ReverseGeocode(lat, lon)
+
+// Check each level before accessing
+if result.Province != nil {
+    fmt.Printf("Province: %s (%s)\n", result.Province.Name, result.Province.Code)
+}
+if result.Regency != nil {
+    fmt.Printf("Regency: %s (%s)\n", result.Regency.Name, result.Regency.Code)
+}
+if result.District != nil {
+    fmt.Printf("District: %s (%s)\n", result.District.Name, result.District.Code)
+}
+if result.Village != nil {
+    fmt.Printf("Village: %s (%s)\n", result.Village.Name, result.Village.Code)
+}
+```
+
+```go Helper Function
+func formatLocation(result geocoder.Result) string {
+    if result.Province == nil {
+        return "Unknown location"
+    }
+    
+    parts := []string{result.Province.Name}
+    if result.Regency != nil {
+        parts = append(parts, result.Regency.Name)
+    }
+    if result.District != nil {
+        parts = append(parts, result.District.Name)
+    }
+    if result.Village != nil {
+        parts = append(parts, result.Village.Name)
+    }
+    
+    return strings.Join(parts, ", ")
+}
+```
+
+</CodeGroup>
+
+## Coordinates Outside Indonesia
+
+Coordinates outside Indonesian territory will return empty results:
+
+```go
+// Coordinates in Malaysia
+result := gc.ReverseGeocode(3.1390, 101.6869)
+
+if result.Province == nil {
+    fmt.Println("Location outside Indonesia")
+}
+```
+
+<Note>
+Geocoder ID only contains Indonesian administrative boundaries. Coordinates outside Indonesia will always return nil for all fields.
+</Note>
+
+## Resource Cleanup
+
+Always close the geocoder to free database resources:
+
+```go
+gc, err := geocoder.NewDefault()
+if err != nil {
+    return err
+}
+defer gc.Close() // Ensures cleanup even if panic occurs
+
+// Your code here...
+```
+
+### Close Error Handling
+
+The `Close()` method returns an error:
+
+```go
+if err := gc.Close(); err != nil {
+    log.Printf("Error closing geocoder: %v", err)
+}
+```
+
+<Warning>
+Failing to call `Close()` may lead to resource leaks, especially in long-running applications or when creating multiple geocoder instances.
+</Warning>
+
+## Batch Processing Error Handling
+
+When processing multiple coordinates, decide how to handle individual failures:
+
+<Tabs>
+  <Tab title="Skip Invalid">
+    ```go
+    type LocationResult struct {
+        Coord   geocoder.Coord
+        Result  geocoder.Result
+        Found   bool
+    }
+
+    var results []LocationResult
+    for _, coord := range coordinates {
+        result := gc.ReverseGeocode(coord.Lat, coord.Lon)
+        results = append(results, LocationResult{
+            Coord:  coord,
+            Result: result,
+            Found:  result.Province != nil,
+        })
+    }
+
+    // Filter successful results
+    var validResults []LocationResult
+    for _, r := range results {
+        if r.Found {
+            validResults = append(validResults, r)
+        }
+    }
+    ```
+  </Tab>
+  <Tab title="Log Failures">
+    ```go
+    successCount := 0
+    for i, coord := range coordinates {
+        result := gc.ReverseGeocode(coord.Lat, coord.Lon)
+        
+        if result.Province == nil {
+            log.Printf("Coordinate %d (%.4f, %.4f) not found",
+                i, coord.Lat, coord.Lon)
+            continue
+        }
+        
+        successCount++
+        // Process valid result...
+    }
+    
+    log.Printf("Processed %d/%d coordinates successfully",
+        successCount, len(coordinates))
+    ```
+  </Tab>
+</Tabs>
+
+## Input Validation
+
+While Geocoder ID doesn't validate coordinate ranges, you may want to add checks:
+
+```go
+func isValidCoordinate(lat, lon float64) bool {
+    // Rough bounds for Indonesia
+    return lat >= -11 && lat <= 6 && lon >= 95 && lon <= 141
+}
+
+func safeReverseGeocode(gc *geocoder.Geocoder, lat, lon float64) (geocoder.Result, error) {
+    if !isValidCoordinate(lat, lon) {
+        return geocoder.Result{}, fmt.Errorf("coordinates outside Indonesia bounds")
+    }
+    
+    result := gc.ReverseGeocode(lat, lon)
+    if result.Province == nil {
+        return result, fmt.Errorf("location not found in database")
+    }
+    
+    return result, nil
+}
+```
+
+## Error Handling Best Practices
+
+1. **Always check initialization errors** - Don't assume `NewDefault()` will succeed
+2. **Use defer for cleanup** - Ensures `Close()` is called even on panic
+3. **Check for nil results** - Never assume a location was found
+4. **Validate input when needed** - Pre-validate coordinates for your use case
+5. **Log failures in batch operations** - Track success/failure rates
+
+<Info>
+The `Result` struct never causes panics - it simply returns empty (nil) fields when no match is found. This makes it safe to use without explicit error checking, though checking for nil is still recommended.
+</Info>
+
+## Complete Error Handling Example
+
+```go
+package main
+
+import (
+    "fmt"
+    "log"
+
+    geocoder "github.com/zsbahtiar/geocoder-id"
+)
+
+func main() {
+    // Initialize with error handling
+    gc, err := geocoder.NewDefault()
+    if err != nil {
+        log.Fatalf("Failed to initialize geocoder: %v", err)
+    }
+    defer func() {
+        if err := gc.Close(); err != nil {
+            log.Printf("Error closing geocoder: %v", err)
+        }
+    }()
+
+    // Process coordinates with validation
+    coordinates := []struct {
+        lat, lon float64
+        name     string
+    }{
+        {-6.2088, 106.8456, "Jakarta"},
+        {0.0, 0.0, "Invalid"},
+        {-7.2575, 112.7521, "Surabaya"},
+    }
+
+    for _, coord := range coordinates {
+        result := gc.ReverseGeocode(coord.lat, coord.lon)
+        
+        if result.Province == nil {
+            log.Printf("Location not found for %s (%.4f, %.4f)",
+                coord.name, coord.lat, coord.lon)
+            continue
+        }
+
+        fmt.Printf("%s: %s\n", coord.name, result.Province.Name)
+    }
+}
+```

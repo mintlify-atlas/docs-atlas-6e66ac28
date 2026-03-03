@@ -1,0 +1,202 @@
+---
+title: 'Administrative Levels'
+description: 'Understanding Indonesian administrative divisions and querying specific levels'
+---
+
+## Indonesian Administrative Hierarchy
+
+Indonesia has a four-level administrative hierarchy:
+
+1. **Province (Provinsi)** - The top level, e.g., "DKI JAKARTA"
+2. **Regency (Kabupaten/Kota)** - Second level, e.g., "KOTA JAKARTA PUSAT"
+3. **District (Kecamatan)** - Third level, e.g., "MENTENG"
+4. **Village (Kelurahan/Desa)** - Fourth level (most detailed), e.g., "MENTENG"
+
+## Level Constants
+
+Geocoder ID provides constants for each administrative level:
+
+```go
+type Level string
+
+const (
+    LevelProvince Level = "province"
+    LevelRegency  Level = "regency"
+    LevelDistrict Level = "district"
+    LevelVillage  Level = "village"
+)
+```
+
+## Querying Specific Levels
+
+Use `ReverseGeocodeLevel` to query at a specific administrative level:
+
+```go
+func (g *Geocoder) ReverseGeocodeLevel(lat, lon float64, level Level) Result
+```
+
+### Function Behavior
+
+The `level` parameter determines the granularity of the search:
+
+- **`LevelProvince`**: Returns only province information
+- **`LevelRegency`**: Returns province and regency
+- **`LevelDistrict`**: Returns province, regency, and district
+- **`LevelVillage`**: Returns all four levels (same as `ReverseGeocode`)
+
+<Info>
+`ReverseGeocode(lat, lon)` is equivalent to `ReverseGeocodeLevel(lat, lon, LevelVillage)` - it always returns the most detailed level available.
+</Info>
+
+## Example: Querying All Levels
+
+```go
+package main
+
+import (
+    "fmt"
+    "log"
+
+    geocoder "github.com/zsbahtiar/geocoder-id"
+)
+
+func main() {
+    gc, err := geocoder.NewDefault()
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer gc.Close()
+
+    lat, lon := -6.2088, 106.8456
+
+    fmt.Println("=== Query at different levels ===\n")
+
+    levels := []geocoder.Level{
+        geocoder.LevelProvince,
+        geocoder.LevelRegency,
+        geocoder.LevelDistrict,
+        geocoder.LevelVillage,
+    }
+
+    for _, level := range levels {
+        result := gc.ReverseGeocodeLevel(lat, lon, level)
+        fmt.Printf("Level: %s\n", level)
+        if result.Province != nil {
+            fmt.Printf("  Result: %s", result.Province.Name)
+            if result.Regency != nil {
+                fmt.Printf(" > %s", result.Regency.Name)
+            }
+            if result.District != nil {
+                fmt.Printf(" > %s", result.District.Name)
+            }
+            if result.Village != nil {
+                fmt.Printf(" > %s", result.Village.Name)
+            }
+            fmt.Println()
+        } else {
+            fmt.Println("  Result: not found")
+        }
+        fmt.Println()
+    }
+}
+```
+
+## Expected Output
+
+<CodeGroup>
+
+```text Output
+=== Query at different levels ===
+
+Level: province
+  Result: DKI JAKARTA
+
+Level: regency
+  Result: DKI JAKARTA > KOTA JAKARTA PUSAT
+
+Level: district
+  Result: DKI JAKARTA > KOTA JAKARTA PUSAT > MENTENG
+
+Level: village
+  Result: DKI JAKARTA > KOTA JAKARTA PUSAT > MENTENG > MENTENG
+```
+
+</CodeGroup>
+
+## Understanding Results by Level
+
+<Tabs>
+  <Tab title="Province">
+    ```go
+    result := gc.ReverseGeocodeLevel(lat, lon, geocoder.LevelProvince)
+    // result.Province != nil
+    // result.Regency == nil
+    // result.District == nil
+    // result.Village == nil
+    ```
+    Returns only the province containing the coordinate.
+  </Tab>
+  <Tab title="Regency">
+    ```go
+    result := gc.ReverseGeocodeLevel(lat, lon, geocoder.LevelRegency)
+    // result.Province != nil
+    // result.Regency != nil
+    // result.District == nil
+    // result.Village == nil
+    ```
+    Returns province and regency (city/district level).
+  </Tab>
+  <Tab title="District">
+    ```go
+    result := gc.ReverseGeocodeLevel(lat, lon, geocoder.LevelDistrict)
+    // result.Province != nil
+    // result.Regency != nil
+    // result.District != nil
+    // result.Village == nil
+    ```
+    Returns province, regency, and district (sub-district).
+  </Tab>
+  <Tab title="Village">
+    ```go
+    result := gc.ReverseGeocodeLevel(lat, lon, geocoder.LevelVillage)
+    // All fields may be populated (if location exists)
+    ```
+    Returns all available administrative levels.
+  </Tab>
+</Tabs>
+
+## Administrative Codes
+
+Each location includes a hierarchical code:
+
+```go
+type Location struct {
+    Code string `json:"code"`
+    Name string `json:"name"`
+}
+```
+
+Code examples:
+- Province: `"31"` (DKI JAKARTA)
+- Regency: `"3171"` (KOTA JAKARTA PUSAT)
+- District: `"317104"` (MENTENG)
+- Village: `"3171041006"` (MENTENG)
+
+<Note>
+Administrative codes follow Indonesian BPS (Badan Pusat Statistik) standards. Longer codes represent more specific locations, with the province code as a prefix.
+</Note>
+
+## Use Cases
+
+Different levels are useful for different scenarios:
+
+| Level | Use Case |
+|-------|----------|
+| **Province** | National statistics, regional grouping |
+| **Regency** | City/district-level services, delivery zones |
+| **District** | Neighborhood services, local branches |
+| **Village** | Precise address validation, detailed mapping |
+
+<Warning>
+Always check if result fields are `nil` before accessing them, especially when working with different administrative levels.
+</Warning>

@@ -1,0 +1,253 @@
+---
+title: 'Configuration'
+description: 'Configure database paths and environment variables for Geocoder ID CLI'
+---
+
+## Environment Variables
+
+### GEOCODER_DB_PATH
+
+Override the default database location by setting the `GEOCODER_DB_PATH` environment variable.
+
+```bash
+export GEOCODER_DB_PATH=/custom/path/geocoder.db
+geocoder geocode --coords="-6.2088 106.8456"
+```
+
+<ParamField path="GEOCODER_DB_PATH" type="string">
+  Custom path to the geocoder database file. When set, this path is used instead of the default auto-detected location.
+</ParamField>
+
+## Database Locations
+
+### Default Location
+
+The geocoder database is automatically stored in a platform-specific location:
+
+<CodeGroup>
+  ```bash macOS
+  ~/.geocoder-id/geocoder.db
+  ```
+
+  ```bash Linux
+  ~/.geocoder-id/geocoder.db
+  ```
+
+  ```bash Windows
+  %USERPROFILE%\.geocoder-id\geocoder.db
+  ```
+</CodeGroup>
+
+### Priority Order
+
+The CLI determines the database path using the following priority:
+
+1. **`--db` flag** - Highest priority
+   ```bash
+   geocoder geocode --coords="-6.2088 106.8456" --db=/custom/geocoder.db
+   ```
+
+2. **`GEOCODER_DB_PATH` environment variable**
+   ```bash
+   export GEOCODER_DB_PATH=/custom/geocoder.db
+   ```
+
+3. **Default auto-detected location** - Lowest priority
+   ```
+   ~/.geocoder-id/geocoder.db
+   ```
+
+## Auto-Download Behavior
+
+### First-Time Setup
+
+On first use, if the database file doesn't exist at the expected location, it will be automatically downloaded:
+
+```bash
+geocoder geocode --coords="-6.2088 106.8456"
+```
+
+**Process:**
+1. CLI checks for database at default location
+2. If not found, initiates automatic download
+3. Database is saved to `~/.geocoder-id/geocoder.db`
+4. Geocoding proceeds with the downloaded database
+
+<Info>
+  The database file is approximately 50-100 MB. Ensure you have sufficient disk space and an active internet connection for the initial download.
+</Info>
+
+### Skipping Auto-Download
+
+To use a manually downloaded or custom database, specify the path explicitly:
+
+<CodeGroup>
+  ```bash Using --db flag
+  geocoder geocode --coords="-6.2088 106.8456" --db=/path/to/geocoder.db
+  ```
+
+  ```bash Using environment variable
+  export GEOCODER_DB_PATH=/path/to/geocoder.db
+  geocoder geocode --coords="-6.2088 106.8456"
+  ```
+</CodeGroup>
+
+<Warning>
+  When using custom database paths, the auto-download feature is bypassed. Ensure your database file exists and is valid before running commands.
+</Warning>
+
+## Advanced Configuration
+
+### Shared Database for Multiple Users
+
+Set up a shared database location for multiple users on the same system:
+
+```bash
+# As administrator, download to shared location
+sudo mkdir -p /usr/local/share/geocoder-id
+sudo geocoder geocode --coords="-6.2088 106.8456" --db=/usr/local/share/geocoder-id/geocoder.db
+
+# Set read permissions
+sudo chmod -R 755 /usr/local/share/geocoder-id
+
+# Users configure environment variable
+export GEOCODER_DB_PATH=/usr/local/share/geocoder-id/geocoder.db
+```
+
+Add to shell configuration file (`.bashrc`, `.zshrc`, etc.):
+
+```bash
+echo 'export GEOCODER_DB_PATH=/usr/local/share/geocoder-id/geocoder.db' >> ~/.bashrc
+```
+
+### CI/CD Environments
+
+For automated environments, pre-download the database to avoid download delays:
+
+<Steps>
+  <Step title="Download database once">
+    ```bash
+    mkdir -p ~/.geocoder-id
+    # Run any geocode command to trigger download
+    geocoder geocode --coords="-6.2088 106.8456" > /dev/null 2>&1
+    ```
+  </Step>
+
+  <Step title="Cache the database directory">
+    ```yaml
+    # Example GitHub Actions cache
+    - uses: actions/cache@v3
+      with:
+        path: ~/.geocoder-id
+        key: geocoder-db-${{ hashFiles('~/.geocoder-id/geocoder.db') }}
+    ```
+  </Step>
+
+  <Step title="Use in subsequent runs">
+    ```bash
+    geocoder geocode --coords="-6.2088 106.8456"
+    ```
+  </Step>
+</Steps>
+
+### Docker Environments
+
+Mount the database as a volume to persist across container runs:
+
+```dockerfile
+FROM alpine:latest
+
+# Install geocoder binary
+COPY geocoder /usr/local/bin/geocoder
+RUN chmod +x /usr/local/bin/geocoder
+
+# Create database directory
+RUN mkdir -p /data/geocoder-id
+
+# Set environment variable
+ENV GEOCODER_DB_PATH=/data/geocoder-id/geocoder.db
+
+ENTRYPOINT ["geocoder"]
+```
+
+Run with volume mount:
+
+```bash
+docker run -v $(pwd)/geocoder-data:/data/geocoder-id geocoder-cli \
+  geocode --coords="-6.2088 106.8456"
+```
+
+### Database Updates
+
+The database contains Indonesian administrative boundaries that may be updated periodically. To update:
+
+<Steps>
+  <Step title="Remove old database">
+    ```bash
+    rm ~/.geocoder-id/geocoder.db
+    ```
+  </Step>
+
+  <Step title="Trigger re-download">
+    ```bash
+    geocoder geocode --coords="-6.2088 106.8456"
+    ```
+    
+    The latest database version will be automatically downloaded.
+  </Step>
+</Steps>
+
+<Note>
+  Database updates are infrequent and typically correspond with official updates to Indonesian administrative boundaries from government sources.
+</Note>
+
+## Troubleshooting
+
+### Database Not Found
+
+If you see database-related errors:
+
+1. **Check the expected location:**
+   ```bash
+   ls -la ~/.geocoder-id/
+   ```
+
+2. **Verify environment variable:**
+   ```bash
+   echo $GEOCODER_DB_PATH
+   ```
+
+3. **Test auto-download with debug mode:**
+   ```bash
+   rm ~/.geocoder-id/geocoder.db
+   geocoder geocode --coords="-6.2088 106.8456" --debug
+   ```
+
+### Permission Issues
+
+If the CLI cannot write to the default location:
+
+```bash
+# Ensure directory exists and is writable
+mkdir -p ~/.geocoder-id
+chmod 755 ~/.geocoder-id
+
+# Or use a custom location
+export GEOCODER_DB_PATH=/tmp/geocoder.db
+```
+
+### Network Issues During Download
+
+If auto-download fails due to network issues:
+
+1. **Check internet connection**
+2. **Retry with debug mode:**
+   ```bash
+   geocoder geocode --coords="-6.2088 106.8456" --debug
+   ```
+3. **Manually download and place in expected location:**
+   ```bash
+   mkdir -p ~/.geocoder-id
+   # Download from releases page
+   curl -L <database-url> -o ~/.geocoder-id/geocoder.db
+   ```

@@ -1,80 +1,277 @@
 ---
-title: "Quickstart"
-description: "Start building awesome documentation in minutes"
+title: Quick Start
+description: Get started with Geocoder ID in minutes
 ---
 
-## Get started in three steps
+This guide will help you perform your first reverse geocoding query using Geocoder ID.
 
-Get your documentation site running locally and make your first customization.
+## Using the Go Library
 
-### Step 1: Set up your local environment
-
-<AccordionGroup>
-  <Accordion icon="copy" title="Clone your docs locally">
-    During the onboarding process, you created a GitHub repository with your docs content if you didn't already have one. You can find a link to this repository in your [dashboard](https://dashboard.mintlify.com).
+<Steps>
+  <Step title="Create a new Go file">
+    Create a file called `main.go`:
     
-    To clone the repository locally so that you can make and preview changes to your docs, follow the [Cloning a repository](https://docs.github.com/en/repositories/creating-and-managing-repositories/cloning-a-repository) guide in the GitHub docs.
-  </Accordion>
-  <Accordion icon="rectangle-terminal" title="Start the preview server">
-    1. Install the Mintlify CLI: `npm i -g mint`
-    2. Navigate to your docs directory and run: `mint dev`
-    3. Open `http://localhost:3000` to see your docs live!
+    ```go
+    package main
     
-    <Tip>Your preview updates automatically as you edit files.</Tip>
-  </Accordion>
-</AccordionGroup>
-
-### Step 2: Deploy your changes
-
-<AccordionGroup>
-  <Accordion icon="github" title="Install our GitHub app">
-    Install the Mintlify GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app).
+    import (
+        "fmt"
+        "log"
+        
+        geocoder "github.com/zsbahtiar/geocoder-id"
+    )
     
-    Our GitHub app automatically deploys your changes to your docs site, so you don't need to manage deployments yourself.
-</Accordion>
-<Accordion icon="palette" title="Update your site name and colors">
-    For a first change, let's update the name and colors of your docs site.
+    func main() {
+        // Initialize geocoder (auto-downloads database if not found)
+        gc, err := geocoder.NewDefault()
+        if err != nil {
+            log.Fatal(err)
+        }
+        defer gc.Close()
+        
+        // Reverse geocode coordinates (Jakarta)
+        result := gc.ReverseGeocode(-6.2088, 106.8456)
+        
+        if result.Village != nil {
+            fmt.Printf("Village: %s (%s)\n", result.Village.Name, result.Village.Code)
+        }
+        if result.District != nil {
+            fmt.Printf("District: %s (%s)\n", result.District.Name, result.District.Code)
+        }
+        if result.Regency != nil {
+            fmt.Printf("Regency: %s (%s)\n", result.Regency.Name, result.Regency.Code)
+        }
+        if result.Province != nil {
+            fmt.Printf("Province: %s (%s)\n", result.Province.Name, result.Province.Code)
+        }
+    }
+    ```
+  </Step>
+  
+  <Step title="Run the program">
+    ```bash
+    go run main.go
+    ```
+    
+    Expected output:
+    ```
+    Village: Pasar Manggis (31.74.02.1006)
+    District: Setiabudi (31.74.02)
+    Regency: Kota Administrasi Jakarta Selatan (31.74)
+    Province: DKI Jakarta (31)
+    ```
+  </Step>
+</Steps>
 
-    1. Open `docs.json` in your editor.
-    2. Change the `"name"` field to your project name.
-    3. Update the `"colors"` to match your brand.
-    4. Save and see your changes instantly at `http://localhost:3000`.
+## Using the CLI
 
-    <Tip>Try changing the primary color to see an immediate difference!</Tip>
-  </Accordion>
-</AccordionGroup>
+<Steps>
+  <Step title="Basic reverse geocoding">
+    Geocode a single coordinate pair:
+    
+    ```bash
+    geocoder geocode --coords="-6.2088 106.8456"
+    ```
+    
+    Output in table format:
+    ```
+    | province_code | province_name | regency_code | regency_name                      | district_code | district_name | village_code  | village_name  |
+    |---------------|---------------|--------------|-----------------------------------|---------------|---------------|---------------|---------------|
+    | 31            | DKI Jakarta   | 31.74        | Kota Administrasi Jakarta Selatan | 31.74.02      | Setiabudi     | 31.74.02.1006 | Pasar Manggis |
+    ```
+  </Step>
+  
+  <Step title="Get JSON output">
+    For programmatic use, output as JSON:
+    
+    ```bash
+    geocoder geocode --coords="-6.2088 106.8456" --output=json
+    ```
+    
+    ```json
+    [
+      {
+        "province": { "code": "31", "name": "DKI Jakarta" },
+        "regency": { "code": "31.74", "name": "Kota Administrasi Jakarta Selatan" },
+        "district": { "code": "31.74.02", "name": "Setiabudi" },
+        "village": { "code": "31.74.02.1006", "name": "Pasar Manggis" }
+      }
+    ]
+    ```
+  </Step>
+  
+  <Step title="Geocode multiple coordinates">
+    Process multiple coordinates at once using semicolon separation:
+    
+    ```bash
+    geocoder geocode --coords="-6.2088 106.8456;-2.04963 110.18774"
+    ```
+    
+    <Info>
+      The second coordinate is in Central Kalimantan (Kasongan, Katingan Regency).
+    </Info>
+  </Step>
+</Steps>
 
-### Step 3: Go live
+## Advanced Usage
 
-<Accordion icon="rocket" title="Publish your docs">
-  1. Commit and push your changes.
-  2. Your docs will update and be live in moments!
-</Accordion>
+### Query Specific Administrative Levels
 
-## Next steps
+You can limit results to a specific administrative level using the `--level` flag (CLI) or `ReverseGeocodeLevel()` method (Go library).
 
-Now that you have your docs running, explore these key features:
+<CodeGroup>
+```bash CLI - Province Level
+geocoder geocode --coords="-6.2088 106.8456" --level=province
+```
 
-<CardGroup cols={2}>
+```bash CLI - District Level
+geocoder geocode --coords="-6.2088 106.8456" --level=district
+```
 
-<Card title="Write Content" icon="pen-to-square" href="/essentials/markdown">
-  Learn MDX syntax and start writing your documentation.
-</Card>
+```go Go Library
+// Query at different levels
+result := gc.ReverseGeocodeLevel(-6.2088, 106.8456, geocoder.LevelProvince)
+result := gc.ReverseGeocodeLevel(-6.2088, 106.8456, geocoder.LevelRegency)
+result := gc.ReverseGeocodeLevel(-6.2088, 106.8456, geocoder.LevelDistrict)
+result := gc.ReverseGeocodeLevel(-6.2088, 106.8456, geocoder.LevelVillage)
+```
+</CodeGroup>
 
-<Card title="Customize style" icon="palette" href="/essentials/settings">
-  Make your docs match your brand perfectly.
-</Card>
+Available levels:
+- `province` - Province (Provinsi)
+- `regency` - Regency/City (Kabupaten/Kota)
+- `district` - District (Kecamatan)
+- `village` - Village/Sub-district (Kelurahan/Desa) - *default*
 
-<Card title="Add code examples" icon="square-code" href="/essentials/code">
-  Include syntax-highlighted code blocks.
-</Card>
+### Batch Processing with Go
 
-<Card title="API documentation" icon="code" href="/api-reference/introduction">
-  Auto-generate API docs from OpenAPI specs.
-</Card>
+Process multiple coordinates efficiently:
 
-</CardGroup>
+```go
+package main
+
+import (
+    "fmt"
+    "log"
+    
+    geocoder "github.com/zsbahtiar/geocoder-id"
+)
+
+func main() {
+    gc, err := geocoder.NewDefault()
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer gc.Close()
+    
+    // Define coordinates to process
+    coordinates := []geocoder.Coord{
+        {Lat: -6.2088, Lon: 106.8456},  // Jakarta
+        {Lat: -2.04963, Lon: 110.18774}, // Kalimantan
+        {Lat: -7.7956, Lon: 110.3695},   // Yogyakarta
+    }
+    
+    // Process each coordinate
+    for _, coord := range coordinates {
+        result := gc.ReverseGeocode(coord.Lat, coord.Lon)
+        
+        if result.Province != nil {
+            fmt.Printf("%.4f, %.4f -> %s, %s\n", 
+                coord.Lat, coord.Lon,
+                result.Village.Name, result.Province.Name)
+        }
+    }
+}
+```
+
+### Parsing Coordinate Strings
+
+Use the built-in `ParseCoords()` function to parse coordinate strings:
+
+```go
+package main
+
+import (
+    "fmt"
+    "log"
+    
+    geocoder "github.com/zsbahtiar/geocoder-id"
+)
+
+func main() {
+    gc, err := geocoder.NewDefault()
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer gc.Close()
+    
+    // Parse coordinate string (same format as CLI)
+    coordStr := "-6.2088 106.8456;-2.04963 110.18774"
+    coords := geocoder.ParseCoords(coordStr)
+    
+    for _, coord := range coords {
+        result := gc.ReverseGeocode(coord.Lat, coord.Lon)
+        if result.Province != nil {
+            fmt.Printf("%s, %s\n", result.District.Name, result.Province.Name)
+        }
+    }
+}
+```
+
+## Understanding the Result Structure
+
+The `Result` struct contains pointers to each administrative level:
+
+```go
+type Result struct {
+    Province *Location `json:"province,omitempty"`
+    Regency  *Location `json:"regency,omitempty"`
+    District *Location `json:"district,omitempty"`
+    Village  *Location `json:"village,omitempty"`
+}
+
+type Location struct {
+    Code string `json:"code"`
+    Name string `json:"name"`
+}
+```
 
 <Note>
-  **Need help?** See our [full documentation](https://mintlify.com/docs) or join our [community](https://mintlify.com/community).
+  All fields are pointers and may be `nil` if the coordinate doesn't fall within any Indonesian administrative boundary.
 </Note>
+
+Always check for `nil` before accessing location data:
+
+```go
+result := gc.ReverseGeocode(lat, lon)
+
+if result.Village != nil {
+    fmt.Printf("Found: %s\n", result.Village.Name)
+} else {
+    fmt.Println("Coordinate not found in database")
+}
+```
+
+## Example Coordinates to Try
+
+Here are some coordinates across Indonesia you can test:
+
+| Location | Coordinates | Expected Province |
+|----------|-------------|-------------------|
+| Jakarta (Monas) | `-6.1751, 106.8270` | DKI Jakarta |
+| Surabaya | `-7.2575, 112.7521` | Jawa Timur |
+| Bali (Ubud) | `-8.5069, 115.2625` | Bali |
+| Yogyakarta (Malioboro) | `-7.7926, 110.3650` | DI Yogyakarta |
+| Medan | `3.5952, 98.6722` | Sumatera Utara |
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="API Reference" icon="code" href="/api/geocoder">
+    Explore the complete API documentation
+  </Card>
+  
+  <Card title="CLI Reference" icon="terminal" href="/cli/usage">
+    Learn about all CLI commands and options
+  </Card>
+</CardGroup>

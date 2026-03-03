@@ -1,0 +1,149 @@
+---
+title: 'Administrative Levels'
+description: 'Query at different administrative levels'
+---
+
+This example demonstrates how to query the same coordinate at different administrative levels, showing the granularity control available in Geocoder ID.
+
+## Overview
+
+The levels example shows how to:
+- Use `ReverseGeocodeLevel()` to query at specific administrative levels
+- Understand the difference between Province, Regency, District, and Village levels
+- See how results vary based on the requested level
+- Format hierarchical location data
+
+## Complete Code
+
+```go
+package main
+
+import (
+	"fmt"
+	"log"
+
+	geocoder "github.com/zsbahtiar/geocoder-id"
+)
+
+func main() {
+	gc, err := geocoder.NewDefault()
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer gc.Close()
+
+	lat, lon := -6.2088, 106.8456
+
+	fmt.Println("=== Query at different levels ===")
+
+	levels := []geocoder.Level{
+		geocoder.LevelProvince,
+		geocoder.LevelRegency,
+		geocoder.LevelDistrict,
+		geocoder.LevelVillage,
+	}
+
+	for _, level := range levels {
+		result := gc.ReverseGeocodeLevel(lat, lon, level)
+		fmt.Printf("Level: %s\n", level)
+		if result.Province != nil {
+			fmt.Printf("  Result: %s", result.Province.Name)
+			if result.Regency != nil {
+				fmt.Printf(" > %s", result.Regency.Name)
+			}
+			if result.District != nil {
+				fmt.Printf(" > %s", result.District.Name)
+			}
+			if result.Village != nil {
+				fmt.Printf(" > %s", result.Village.Name)
+			}
+			fmt.Println()
+		} else {
+			fmt.Println("  Result: not found")
+		}
+		fmt.Println()
+	}
+}
+```
+
+## How It Works
+
+1. **Define coordinate** - Use a single coordinate for all queries
+2. **Define levels** - Create a slice of all available administrative levels
+3. **Query each level** - Use `ReverseGeocodeLevel()` to query at each specific level
+4. **Display hierarchy** - Show the administrative hierarchy for each level query
+
+<Info>
+The four administrative levels in Indonesia are:
+- **Province** (Provinsi) - The highest level
+- **Regency** (Kabupaten/Kota) - City or regency level
+- **District** (Kecamatan) - Sub-city/sub-regency level
+- **Village** (Kelurahan/Desa) - The most granular level
+</Info>
+
+## Expected Output
+
+```
+=== Query at different levels ===
+
+Level: province
+  Result: DKI Jakarta
+
+Level: regency
+  Result: DKI Jakarta > Jakarta Pusat
+
+Level: district
+  Result: DKI Jakarta > Jakarta Pusat > Menteng
+
+Level: village
+  Result: DKI Jakarta > Jakarta Pusat > Menteng > Menteng
+```
+
+## Understanding Levels
+
+<CodeGroup>
+
+```go Province Level
+// Returns only province-level information
+result := gc.ReverseGeocodeLevel(lat, lon, geocoder.LevelProvince)
+// result.Province will be populated
+// result.Regency, District, Village will be nil
+```
+
+```go Regency Level
+// Returns province and regency information
+result := gc.ReverseGeocodeLevel(lat, lon, geocoder.LevelRegency)
+// result.Province and result.Regency will be populated
+// result.District and Village will be nil
+```
+
+```go District Level
+// Returns province, regency, and district information
+result := gc.ReverseGeocodeLevel(lat, lon, geocoder.LevelDistrict)
+// result.Province, Regency, and District will be populated
+// result.Village will be nil
+```
+
+```go Village Level
+// Returns all levels (most granular)
+result := gc.ReverseGeocodeLevel(lat, lon, geocoder.LevelVillage)
+// All fields will be populated (if data exists)
+```
+
+</CodeGroup>
+
+<Tip>
+Use specific levels when you only need coarse-grained location data. For example, if you only need province information, querying at `LevelProvince` is more efficient than getting village-level data and discarding the extra information.
+</Tip>
+
+## Use Cases
+
+- **Analytics dashboards** - Show data aggregated at different administrative levels
+- **Privacy protection** - Use coarser levels to anonymize location data
+- **Performance optimization** - Query only the level of detail you need
+- **Hierarchical displays** - Build cascading dropdowns or navigation menus
+- **Regional reporting** - Generate reports at province or regency level
+
+<Note>
+The `ReverseGeocode()` method is equivalent to `ReverseGeocodeLevel()` with `LevelVillage` - it returns all available levels.
+</Note>

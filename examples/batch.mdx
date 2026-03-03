@@ -1,0 +1,119 @@
+---
+title: 'Batch Processing'
+description: 'Process multiple coordinates efficiently'
+---
+
+This example demonstrates how to process multiple coordinates in a batch, ideal for bulk geocoding operations.
+
+## Overview
+
+The batch processing example shows how to:
+- Define multiple coordinates at once
+- Process them in a loop efficiently
+- Collect all results
+- Output results in JSON format
+
+## Complete Code
+
+```go
+package main
+
+import (
+	"encoding/json"
+	"fmt"
+	"log"
+	"os"
+
+	geocoder "github.com/zsbahtiar/geocoder-id"
+)
+
+func main() {
+	gc, err := geocoder.NewDefault()
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer gc.Close()
+
+	coordinates := []geocoder.Coord{
+		{Lat: -6.2088, Lon: 106.8456}, // Jakarta
+		{Lat: -6.9175, Lon: 107.6191}, // Bandung
+		{Lat: -7.2575, Lon: 112.7521}, // Surabaya
+		{Lat: -8.6705, Lon: 115.2126}, // Bali
+		{Lat: -2.0498, Lon: 110.1879}, // Kalimantan Barat
+	}
+
+	var results []geocoder.Result
+	for _, coord := range coordinates {
+		result := gc.ReverseGeocode(coord.Lat, coord.Lon)
+		results = append(results, result)
+	}
+
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "  ")
+	enc.Encode(results)
+
+	fmt.Fprintf(os.Stderr, "\nProcessed %d coordinates\n", len(coordinates))
+}
+```
+
+## How It Works
+
+1. **Define coordinates** - Create a slice of `Coord` structs with latitude and longitude pairs
+2. **Initialize geocoder** - Single geocoder instance is reused for all lookups
+3. **Process in loop** - Iterate through coordinates and geocode each one
+4. **Collect results** - Store all results in a slice
+5. **Output as JSON** - Use the JSON encoder to output results in a structured format
+
+<Info>
+This example processes 5 major Indonesian cities: Jakarta, Bandung, Surabaya, Bali, and a location in Kalimantan Barat.
+</Info>
+
+## Expected Output
+
+```json
+[
+  {
+    "Province": {
+      "Name": "DKI Jakarta",
+      "Code": "31"
+    },
+    "Regency": {
+      "Name": "Jakarta Pusat",
+      "Code": "3171"
+    },
+    "District": {
+      "Name": "Menteng",
+      "Code": "3171081"
+    },
+    "Village": {
+      "Name": "Menteng",
+      "Code": "3171081001"
+    }
+  },
+  ...
+]
+
+Processed 5 coordinates
+```
+
+<Tip>
+For batch processing, reuse a single geocoder instance rather than creating a new one for each coordinate. This is much more efficient as it avoids reloading data.
+</Tip>
+
+## Performance Considerations
+
+- **Single instance** - The geocoder loads data once and reuses it for all queries
+- **Memory efficient** - Results are accumulated in a slice, suitable for moderate batch sizes
+- **Fast lookups** - Uses R-tree spatial indexing for quick coordinate lookups
+
+<Note>
+For very large batches (millions of coordinates), consider processing in chunks and writing results incrementally to avoid memory issues.
+</Note>
+
+## Use Cases
+
+- Processing CSV files with coordinate data
+- Enriching location data in databases
+- Analyzing spatial datasets
+- Generating reports with location information
+- Building data pipelines that require geocoding

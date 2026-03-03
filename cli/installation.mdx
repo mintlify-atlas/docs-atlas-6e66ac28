@@ -1,0 +1,115 @@
+---
+title: 'Installation'
+description: 'Install the Geocoder ID CLI tool on macOS and Linux'
+---
+
+## Quick Install
+
+Download the pre-built binary for your platform from the [latest release](https://github.com/zsbahtiar/geocoder-id/releases/latest).
+
+<Steps>
+  <Step title="Download the binary">
+    Choose the appropriate binary for your platform:
+
+    <CodeGroup>
+      ```bash macOS (Apple Silicon)
+      curl -L https://github.com/zsbahtiar/geocoder-id/releases/latest/download/geocoder-darwin-arm64 -o geocoder
+      ```
+
+      ```bash macOS (Intel)
+      curl -L https://github.com/zsbahtiar/geocoder-id/releases/latest/download/geocoder-darwin-amd64 -o geocoder
+      ```
+
+      ```bash Linux (x86_64)
+      curl -L https://github.com/zsbahtiar/geocoder-id/releases/latest/download/geocoder-linux-amd64 -o geocoder
+      ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Make it executable">
+    ```bash
+    chmod +x geocoder
+    ```
+  </Step>
+
+  <Step title="Move to PATH (optional)">
+    Move the binary to a directory in your PATH for system-wide access:
+
+    <CodeGroup>
+      ```bash macOS/Linux
+      sudo mv geocoder /usr/local/bin/
+      ```
+
+      ```bash Linux (user directory)
+      mkdir -p ~/.local/bin
+      mv geocoder ~/.local/bin/
+      # Add to PATH if needed: export PATH="$HOME/.local/bin:$PATH"
+      ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Verify installation">
+    ```bash
+    geocoder --version
+    ```
+
+    You should see the version information displayed.
+  </Step>
+</Steps>
+
+## Build from Source
+
+If you prefer to build from source or need a custom build:
+
+<Steps>
+  <Step title="Prerequisites">
+    Ensure you have Go 1.18 or later installed:
+    ```bash
+    go version
+    ```
+  </Step>
+
+  <Step title="Clone the repository">
+    ```bash
+    git clone https://github.com/zsbahtiar/geocoder-id
+    cd geocoder-id
+    ```
+  </Step>
+
+  <Step title="Build the binary">
+    <CodeGroup>
+      ```bash Default build
+      make build
+      ```
+
+      ```bash Cross-compile for all platforms
+      make build-all
+      ```
+
+      ```bash Specific platform
+      # macOS Intel
+      make build-darwin-amd64
+      
+      # macOS Apple Silicon
+      make build-darwin-arm64
+      
+      # Linux x86_64
+      make build-linux-amd64
+      ```
+    </CodeGroup>
+  </Step>
+
+  <Step title="Run the binary">
+    ```bash
+    ./geocoder --version
+    ```
+  </Step>
+</Steps>
+
+<Note>
+  The database file is automatically downloaded on first use. No manual database setup is required.
+</Note>
+
+## Next Steps
+
+After installation, proceed to the [Usage](/cli/usage) guide to learn about available commands and options.

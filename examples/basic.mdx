@@ -1,0 +1,82 @@
+---
+title: 'Basic Example'
+description: 'Simple reverse geocoding with Geocoder ID'
+---
+
+This example demonstrates the most basic usage of Geocoder ID - performing a reverse geocoding lookup for a single coordinate.
+
+## Overview
+
+The basic example shows how to:
+- Initialize the geocoder with default settings
+- Perform a reverse geocoding lookup
+- Access the results at all administrative levels
+- Properly close the geocoder when done
+
+## Complete Code
+
+```go
+package main
+
+import (
+	"fmt"
+	"log"
+
+	geocoder "github.com/zsbahtiar/geocoder-id"
+)
+
+func main() {
+	gc, err := geocoder.NewDefault()
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer gc.Close()
+
+	result := gc.ReverseGeocode(-6.2088, 106.8456)
+
+	if result.Province != nil {
+		fmt.Printf("Province: %s (%s)\n", result.Province.Name, result.Province.Code)
+	}
+	if result.Regency != nil {
+		fmt.Printf("Regency:  %s (%s)\n", result.Regency.Name, result.Regency.Code)
+	}
+	if result.District != nil {
+		fmt.Printf("District: %s (%s)\n", result.District.Name, result.District.Code)
+	}
+	if result.Village != nil {
+		fmt.Printf("Village:  %s (%s)\n", result.Village.Name, result.Village.Code)
+	}
+}
+```
+
+## How It Works
+
+1. **Initialize the geocoder** - `NewDefault()` creates a geocoder instance with default settings
+2. **Defer cleanup** - `defer gc.Close()` ensures resources are properly released
+3. **Reverse geocode** - `ReverseGeocode(-6.2088, 106.8456)` looks up the location for Jakarta's coordinates
+4. **Access results** - Check each administrative level (Province, Regency, District, Village) and print if available
+
+<Note>
+The coordinates used in this example (-6.2088, 106.8456) point to a location in Jakarta, Indonesia.
+</Note>
+
+## Expected Output
+
+```
+Province: DKI Jakarta (31)
+Regency:  Jakarta Pusat (3171)
+District: Menteng (3171081)
+Village:  Menteng (3171081001)
+```
+
+<Tip>
+Always check if the result fields are not nil before accessing them, as some coordinates may not have data at all administrative levels.
+</Tip>
+
+## Key Takeaways
+
+- `NewDefault()` is the simplest way to get started
+- Always defer `Close()` to clean up resources
+- The `Result` struct contains fields for all four administrative levels
+- Each level has both a `Name` and `Code` field
+- Check for nil before accessing result fields to avoid panics

@@ -1,0 +1,266 @@
+---
+title: 'Types'
+description: 'Core types for reverse geocoding results and administrative levels'
+---
+
+## Result
+
+The `Result` struct represents the administrative hierarchy returned by reverse geocoding operations.
+
+```go
+type Result struct {
+    Province *Location `json:"province,omitempty"`
+    Regency  *Location `json:"regency,omitempty"`
+    District *Location `json:"district,omitempty"`
+    Village  *Location `json:"village,omitempty"`
+}
+```
+
+<ResponseField name="Province" type="*Location">
+  Province/provinsi information. The highest administrative level in Indonesia (34 provinces).
+</ResponseField>
+
+<ResponseField name="Regency" type="*Location">
+  Regency/kabupaten or city/kota information. The second administrative level.
+</ResponseField>
+
+<ResponseField name="District" type="*Location">
+  District/kecamatan information. The third administrative level.
+</ResponseField>
+
+<ResponseField name="Village" type="*Location">
+  Village/desa or kelurahan information. The most granular administrative level.
+</ResponseField>
+
+<CodeGroup>
+```go Example Usage
+result := geocoder.ReverseGeocode(-6.2088, 106.8456)
+
+// Check if location was found
+if result.Province == nil {
+    fmt.Println("Location not found")
+    return
+}
+
+// Access administrative hierarchy
+fmt.Printf("Province: %s (%s)\n", result.Province.Name, result.Province.Code)
+if result.Regency != nil {
+    fmt.Printf("Regency: %s (%s)\n", result.Regency.Name, result.Regency.Code)
+}
+if result.District != nil {
+    fmt.Printf("District: %s (%s)\n", result.District.Name, result.District.Code)
+}
+if result.Village != nil {
+    fmt.Printf("Village: %s (%s)\n", result.Village.Name, result.Village.Code)
+}
+```
+
+```json JSON Serialization
+{
+  "province": {
+    "code": "31",
+    "name": "DKI Jakarta"
+  },
+  "regency": {
+    "code": "3171",
+    "name": "Kota Jakarta Pusat"
+  },
+  "district": {
+    "code": "317104",
+    "name": "Menteng"
+  },
+  "village": {
+    "code": "3171041006",
+    "name": "Gondangdia"
+  }
+}
+```
+</CodeGroup>
+
+<Note>
+Fields are pointers and may be `nil` depending on the query level or if the coordinate falls outside Indonesian boundaries. The `omitempty` JSON tag excludes nil fields from JSON output.
+</Note>
+
+---
+
+## Location
+
+The `Location` struct represents a single administrative unit with its code and name.
+
+```go
+type Location struct {
+    Code string `json:"code"`
+    Name string `json:"name"`
+}
+```
+
+<ResponseField name="Code" type="string">
+  Official administrative code (Kode Wilayah). Codes follow the Indonesian administrative coding system:
+  - Province: 2 digits (e.g., "31" for DKI Jakarta)
+  - Regency: 4 digits (e.g., "3171" for Jakarta Pusat)
+  - District: 6 digits (e.g., "317104" for Menteng)
+  - Village: 10 digits (e.g., "3171041006" for Gondangdia)
+</ResponseField>
+
+<ResponseField name="Name" type="string">
+  Official name of the administrative unit in Indonesian.
+</ResponseField>
+
+<CodeGroup>
+```go Extracting Codes
+result := geocoder.ReverseGeocode(-6.2088, 106.8456)
+
+// Extract province code for statistical lookup
+provinceCode := result.Province.Code // "31"
+
+// Use hierarchical codes
+if result.Village != nil {
+    // Village codes contain the full hierarchy
+    // "3171041006" = Province(31) + Regency(71) + District(04) + Village(1006)
+    villageCode := result.Village.Code
+}
+```
+</CodeGroup>
+
+<Note>
+Administrative codes are unique identifiers assigned by the Indonesian Ministry of Home Affairs (Kemendagri) and are commonly used in government systems and databases.
+</Note>
+
+---
+
+## Coord
+
+The `Coord` struct represents a geographic coordinate pair.
+
+```go
+type Coord struct {
+    Lat float64
+    Lon float64
+}
+```
+
+<ResponseField name="Lat" type="float64">
+  Latitude in decimal degrees (WGS84 coordinate system). Valid range: -90 to 90. For Indonesia: approximately -11 to 6.
+</ResponseField>
+
+<ResponseField name="Lon" type="float64">
+  Longitude in decimal degrees (WGS84 coordinate system). Valid range: -180 to 180. For Indonesia: approximately 95 to 141.
+</ResponseField>
+
+<CodeGroup>
+```go Creating Coordinates
+// Manual creation
+coord := geocoder.Coord{Lat: -6.2088, Lon: 106.8456}
+
+// Batch processing
+coords := []geocoder.Coord{
+    {Lat: -6.2088, Lon: 106.8456},  // Jakarta
+    {Lat: -7.7956, Lon: 110.3695},  // Yogyakarta
+    {Lat: -8.6500, Lon: 115.2167},  // Bali
+}
+
+for _, coord := range coords {
+    result := geocoder.ReverseGeocode(coord.Lat, coord.Lon)
+    fmt.Println(result.Province.Name)
+}
+```
+
+```go Using ParseCoords
+// Parse from string format
+coords := geocoder.ParseCoords("-6.2088 106.8456; -7.7956 110.3695")
+for _, coord := range coords {
+    result := geocoder.ReverseGeocode(coord.Lat, coord.Lon)
+    fmt.Println(result.Province.Name)
+}
+```
+</CodeGroup>
+
+---
+
+## Level
+
+The `Level` type specifies the administrative level for geocoding queries.
+
+```go
+type Level string
+
+const (
+    LevelProvince Level = "province"
+    LevelRegency  Level = "regency"
+    LevelDistrict Level = "district"
+    LevelVillage  Level = "village"
+)
+```
+
+### Constants
+
+<ParamField path="LevelProvince" type="Level">
+  **Value:** `"province"`
+  
+  Province/provinsi level - the highest administrative division. Indonesia has 34 provinces (including special administrative regions and special capital region).
+</ParamField>
+
+<ParamField path="LevelRegency" type="Level">
+  **Value:** `"regency"`
+  
+  Regency/kabupaten or city/kota level - the second administrative division. Indonesia has over 500 regencies and cities.
+</ParamField>
+
+<ParamField path="LevelDistrict" type="Level">
+  **Value:** `"district"`
+  
+  District/kecamatan level - the third administrative division. Also known as subdistrict in some translations.
+</ParamField>
+
+<ParamField path="LevelVillage" type="Level">
+  **Value:** `"village"`
+  
+  Village/desa or kelurahan level - the most granular administrative division. Indonesia has over 80,000 villages/kelurahan.
+</ParamField>
+
+<CodeGroup>
+```go Using Levels
+// Query at province level (fastest)
+result := geocoder.ReverseGeocodeLevel(-6.2088, 106.8456, geocoder.LevelProvince)
+fmt.Println(result.Province.Name) // "DKI Jakarta"
+fmt.Println(result.Village)       // nil
+
+// Query at district level
+result = geocoder.ReverseGeocodeLevel(-6.2088, 106.8456, geocoder.LevelDistrict)
+fmt.Println(result.District.Name) // "Menteng"
+fmt.Println(result.Village)       // nil
+
+// Query at village level (most granular, default)
+result = geocoder.ReverseGeocodeLevel(-6.2088, 106.8456, geocoder.LevelVillage)
+fmt.Println(result.Village.Name)  // "Gondangdia"
+```
+</CodeGroup>
+
+### Administrative Hierarchy
+
+Indonesia's administrative structure follows this hierarchy:
+
+1. **Province** (Provinsi) - 34 total
+   - Example: DKI Jakarta, Jawa Barat, Bali
+   
+2. **Regency/City** (Kabupaten/Kota) - ~514 total
+   - Kabupaten (regency) for rural areas
+   - Kota (city) for urban areas
+   - Example: Kota Jakarta Pusat, Kabupaten Bandung
+
+3. **District** (Kecamatan) - ~7,000+ total
+   - Also called subdistrict
+   - Example: Menteng, Kebayoran Baru
+
+4. **Village** (Desa/Kelurahan) - ~83,000+ total
+   - Desa for rural areas (has village governance)
+   - Kelurahan for urban areas (government-appointed official)
+   - Example: Gondangdia, Senayan
+
+<Note>
+Use higher administrative levels (Province, Regency) for faster queries when granular precision is not required. Village-level queries are the most detailed but may be slower.
+</Note>
+
+<Warning>
+The Result returned will contain the full administrative hierarchy up to the queried level. For example, querying at `LevelDistrict` will populate Province, Regency, and District fields, but Village will be `nil`.
+</Warning>

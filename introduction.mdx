@@ -1,0 +1,93 @@
+---
+title: Introduction
+description: Offline reverse geocoding for Indonesia - convert coordinates to administrative addresses down to village level
+---
+
+<Info>
+  Geocoder ID is a lightweight, fast, and offline-capable reverse geocoding solution specifically designed for Indonesian administrative boundaries.
+</Info>
+
+## What is Geocoder ID?
+
+Geocoder ID converts geographic coordinates (latitude/longitude) into human-readable administrative addresses for locations in Indonesia. It provides detailed location data from province level down to village/sub-district (kelurahan/desa) level - all without requiring an internet connection after initial setup.
+
+For example, coordinates `-6.2088, 106.8456` become:
+- **Province**: DKI Jakarta
+- **Regency**: Kota Administrasi Jakarta Selatan
+- **District**: Setiabudi
+- **Village**: Pasar Manggis
+
+## Key Features
+
+<CardGroup cols={2}>
+  <Card title="Fully Offline" icon="wifi-slash">
+    No internet connection required after the database is downloaded. Perfect for mobile apps, embedded systems, or air-gapped environments.
+  </Card>
+  
+  <Card title="Blazing Fast" icon="bolt">
+    Uses spatial indexing for O(log n) query performance. Process thousands of coordinates per second with minimal overhead.
+  </Card>
+  
+  <Card title="Auto-Download Database" icon="download">
+    Database automatically downloads on first use. No manual setup required - just install and start geocoding.
+  </Card>
+  
+  <Card title="Dual-Use Design" icon="layer-group">
+    Works as both a Go library for integration into your applications and a standalone CLI tool for quick lookups.
+  </Card>
+</CardGroup>
+
+## How It Works
+
+Geocoder ID uses a DuckDB spatial database with pre-loaded Indonesian administrative boundary data. When you query a coordinate:
+
+1. The spatial index quickly identifies which polygon contains your point
+2. The hierarchical lookup retrieves all administrative levels (province → regency → district → village)
+3. Results are returned with both official codes and names
+
+All queries run locally on your machine with no external API calls.
+
+## Use Cases
+
+<CardGroup cols={2}>
+  <Card title="Mobile Applications" icon="mobile">
+    Provide location context in apps without relying on external geocoding APIs or internet connectivity.
+  </Card>
+  
+  <Card title="Data Processing" icon="database">
+    Enrich large datasets with administrative information by reverse geocoding coordinates in bulk.
+  </Card>
+  
+  <Card title="Analytics & Reporting" icon="chart-line">
+    Aggregate location data by administrative regions for business intelligence and insights.
+  </Card>
+  
+  <Card title="Government Services" icon="building">
+    Build citizen-facing applications with accurate administrative boundary lookups.
+  </Card>
+</CardGroup>
+
+## Administrative Levels
+
+Geocoder ID provides data for all four administrative levels in Indonesia:
+
+| Level | Indonesian Term | Example |
+|-------|----------------|---------|
+| Province | Provinsi | DKI Jakarta |
+| Regency/City | Kabupaten/Kota | Kota Administrasi Jakarta Selatan |
+| District | Kecamatan | Setiabudi |
+| Village/Sub-district | Kelurahan/Desa | Pasar Manggis |
+
+Each level includes both the official administrative code and name.
+
+## Next Steps
+
+<CardGroup cols={2}>
+  <Card title="Installation" icon="download" href="/installation">
+    Install Geocoder ID as a Go library or CLI tool
+  </Card>
+  
+  <Card title="Quick Start" icon="rocket" href="/quickstart">
+    Get started with your first reverse geocoding query
+  </Card>
+</CardGroup>

@@ -1,0 +1,254 @@
+---
+title: 'Geocoder'
+description: 'Main geocoder struct and methods for reverse geocoding'
+---
+
+## Geocoder
+
+The `Geocoder` struct is the main entry point for performing reverse geocoding operations. It manages the connection to the DuckDB database and provides methods for querying administrative boundaries.
+
+```go
+type Geocoder struct {
+    db *sql.DB
+}
+```
+
+---
+
+## New()
+
+Creates a new Geocoder instance with a custom database path.
+
+```go
+func New(dbPath string) (*Geocoder, error)
+```
+
+<ParamField path="dbPath" type="string" required>
+  Path to the DuckDB database file. The database will be opened in read-only mode.
+</ParamField>
+
+<ResponseField name="geocoder" type="*Geocoder">
+  A pointer to the initialized Geocoder instance.
+</ResponseField>
+
+<ResponseField name="error" type="error">
+  Returns an error if:
+  - The database file cannot be opened
+  - The spatial extension fails to load
+</ResponseField>
+
+<CodeGroup>
+```go Example
+geocoder, err := geocoder.New("/path/to/geocoder.duckdb")
+if err != nil {
+    log.Fatal(err)
+}
+defer geocoder.Close()
+```
+</CodeGroup>
+
+<Note>
+The database is opened with `access_mode=read_only` and automatically loads the DuckDB spatial extension required for geometric queries.
+</Note>
+
+---
+
+## NewDefault()
+
+Creates a new Geocoder instance using automatic database discovery and optional auto-download.
+
+```go
+func NewDefault() (*Geocoder, error)
+```
+
+<ResponseField name="geocoder" type="*Geocoder">
+  A pointer to the initialized Geocoder instance.
+</ResponseField>
+
+<ResponseField name="error" type="error">
+  Returns an error if the database cannot be found or downloaded.
+</ResponseField>
+
+<CodeGroup>
+```go Example
+geocoder, err := geocoder.NewDefault()
+if err != nil {
+    log.Fatal(err)
+}
+defer geocoder.Close()
+```
+</CodeGroup>
+
+<Note>
+This method first searches for an existing database using `findDatabase()`. If not found, it automatically downloads the database to `~/.geocoder-id/geocoder.duckdb`.
+</Note>
+
+See [Database Configuration](/api/database) for details on database search paths and auto-download behavior.
+
+---
+
+## Close()
+
+Closes the database connection and releases resources.
+
+```go
+func (g *Geocoder) Close() error
+```
+
+<ResponseField name="error" type="error">
+  Returns an error if closing the database connection fails.
+</ResponseField>
+
+<CodeGroup>
+```go Example
+defer geocoder.Close()
+```
+</CodeGroup>
+
+<Warning>
+Always call `Close()` when done with the Geocoder to prevent resource leaks. Use `defer` immediately after creating the instance.
+</Warning>
+
+---
+
+## ReverseGeocode()
+
+Performs reverse geocoding at the most granular level (village/kelurahan).
+
+```go
+func (g *Geocoder) ReverseGeocode(lat, lon float64) Result
+```
+
+<ParamField path="lat" type="float64" required>
+  Latitude coordinate (WGS84)
+</ParamField>
+
+<ParamField path="lon" type="float64" required>
+  Longitude coordinate (WGS84)
+</ParamField>
+
+<ResponseField name="result" type="Result">
+  A Result struct containing the administrative hierarchy. Returns an empty Result if no location is found.
+</ResponseField>
+
+<CodeGroup>
+```go Example
+result := geocoder.ReverseGeocode(-6.2088, 106.8456)
+if result.Province != nil {
+    fmt.Printf("Province: %s (%s)\n", result.Province.Name, result.Province.Code)
+}
+if result.Village != nil {
+    fmt.Printf("Village: %s (%s)\n", result.Village.Name, result.Village.Code)
+}
+```
+
+```go Output
+Province: DKI Jakarta (31)
+Regency: Kota Jakarta Pusat (3171)
+District: Menteng (317104)
+Village: Gondangdia (3171041006)
+```
+</CodeGroup>
+
+<Note>
+This is equivalent to calling `ReverseGeocodeLevel(lat, lon, LevelVillage)`.
+</Note>
+
+---
+
+## ReverseGeocodeLevel()
+
+Performs reverse geocoding at a specific administrative level.
+
+```go
+func (g *Geocoder) ReverseGeocodeLevel(lat, lon float64, level Level) Result
+```
+
+<ParamField path="lat" type="float64" required>
+  Latitude coordinate (WGS84)
+</ParamField>
+
+<ParamField path="lon" type="float64" required>
+  Longitude coordinate (WGS84)
+</ParamField>
+
+<ParamField path="level" type="Level" required>
+  The administrative level to query. One of:
+  - `LevelProvince` - Province/provinsi (34 total)
+  - `LevelRegency` - Regency/kabupaten or city/kota
+  - `LevelDistrict` - District/kecamatan
+  - `LevelVillage` - Village/desa or kelurahan (most granular)
+</ParamField>
+
+<ResponseField name="result" type="Result">
+  A Result struct containing the administrative hierarchy up to the specified level.
+</ResponseField>
+
+<CodeGroup>
+```go Province Level
+result := geocoder.ReverseGeocodeLevel(-6.2088, 106.8456, geocoder.LevelProvince)
+// Returns only province information
+fmt.Println(result.Province.Name) // "DKI Jakarta"
+fmt.Println(result.Regency)       // nil
+```
+
+```go District Level
+result := geocoder.ReverseGeocodeLevel(-6.2088, 106.8456, geocoder.LevelDistrict)
+// Returns province, regency, and district
+fmt.Println(result.Province.Name) // "DKI Jakarta"
+fmt.Println(result.Regency.Name)  // "Kota Jakarta Pusat"
+fmt.Println(result.District.Name) // "Menteng"
+fmt.Println(result.Village)       // nil
+```
+</CodeGroup>
+
+<Note>
+Use this method when you need faster queries at higher administrative levels or when village-level precision is not required.
+</Note>
+
+See [Types](/api/types) for Level constants and Result structure details.
+
+---
+
+## ParseCoords()
+
+Utility function to parse coordinate strings into a slice of Coord structs.
+
+```go
+func ParseCoords(s string) []Coord
+```
+
+<ParamField path="s" type="string" required>
+  String containing coordinates in the format `"lat1 lon1; lat2 lon2; lat3 lon3"`. Each coordinate pair is separated by semicolons, with latitude and longitude separated by whitespace.
+</ParamField>
+
+<ResponseField name="coords" type="[]Coord">
+  A slice of Coord structs. Invalid coordinates are silently skipped.
+</ResponseField>
+
+<CodeGroup>
+```go Example
+coords := geocoder.ParseCoords("-6.2088 106.8456; -7.7956 110.3695")
+for _, coord := range coords {
+    result := geocoder.ReverseGeocode(coord.Lat, coord.Lon)
+    fmt.Printf("%s\n", result.Province.Name)
+}
+```
+
+```go Output
+DKI Jakarta
+Daerah Istimewa Yogyakarta
+```
+</CodeGroup>
+
+<CodeGroup>
+```go Invalid Coords
+// Invalid coordinates are skipped
+coords := geocoder.ParseCoords("invalid; -6.2088 106.8456; ; abc def")
+fmt.Println(len(coords)) // 1 (only the valid coordinate)
+```
+</CodeGroup>
+
+<Note>
+This function is useful for batch processing coordinates from user input or configuration files. It gracefully handles malformed input by skipping invalid entries.
+</Note>

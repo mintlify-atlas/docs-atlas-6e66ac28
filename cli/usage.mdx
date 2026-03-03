@@ -1,0 +1,227 @@
+---
+title: 'Usage'
+description: 'Complete guide to Geocoder ID CLI commands and options'
+---
+
+## Overview
+
+The Geocoder ID CLI provides offline reverse geocoding for Indonesia, converting coordinates to administrative addresses.
+
+```bash
+geocoder geocode --coords="-6.2088 106.8456"
+```
+
+## Commands
+
+### geocode
+
+Convert coordinates (latitude/longitude) to Indonesian administrative addresses.
+
+```bash
+geocoder geocode [flags]
+```
+
+## Flags
+
+<ParamField path="--coords" type="string" required>
+  Coordinates in "lat lon" format. Multiple coordinates can be separated by semicolons.
+  
+  **Examples:**
+  - Single: `"-6.2088 106.8456"`
+  - Multiple: `"-6.2088 106.8456;-2.04963 110.18774"`
+</ParamField>
+
+<ParamField path="--output" type="string" default="table">
+  Output format for the results.
+  
+  **Options:**
+  - `table` - Formatted table output (default)
+  - `json` - JSON formatted output
+</ParamField>
+
+<ParamField path="--level" type="string" default="village">
+  Administrative level to geocode to. Lower levels include data from all higher levels.
+  
+  **Options:**
+  - `province` - Province level only
+  - `regency` - Province + Regency (Kabupaten/Kota)
+  - `district` - Province + Regency + District (Kecamatan)
+  - `village` - All levels including Village/Kelurahan (default)
+</ParamField>
+
+<ParamField path="--db" type="string">
+  Custom database file path. If not specified, uses auto-detected location (see [Configuration](/cli/configuration)).
+</ParamField>
+
+<ParamField path="--debug" type="boolean" default="false">
+  Enable debug logging to stderr. Shows detailed processing steps including database operations and coordinate parsing.
+</ParamField>
+
+## Examples
+
+### Basic Geocoding
+
+Reverse geocode a single coordinate:
+
+```bash
+geocoder geocode --coords="-6.2088 106.8456"
+```
+
+**Output:**
+```
+| province_code | province_name | regency_code | regency_name                      | district_code | district_name | village_code  | village_name  |
+|---------------|---------------|--------------|-----------------------------------|---------------|---------------|---------------|---------------|
+| 31            | DKI Jakarta   | 31.74        | Kota Administrasi Jakarta Selatan | 31.74.02      | Setiabudi     | 31.74.02.1006 | Pasar Manggis |
+```
+
+### Multiple Coordinates
+
+Geocode multiple locations in a single command:
+
+```bash
+geocoder geocode --coords="-6.2088 106.8456;-2.04963 110.18774"
+```
+
+<Note>
+  Use semicolons to separate multiple coordinates. Each coordinate should be in "lat lon" format with a space between latitude and longitude.
+</Note>
+
+### JSON Output
+
+Get results in JSON format for programmatic use:
+
+```bash
+geocoder geocode --coords="-6.2088 106.8456" --output=json
+```
+
+**Output:**
+```json
+[
+  {
+    "province": {
+      "code": "31",
+      "name": "DKI Jakarta"
+    },
+    "regency": {
+      "code": "31.74",
+      "name": "Kota Administrasi Jakarta Selatan"
+    },
+    "district": {
+      "code": "31.74.02",
+      "name": "Setiabudi"
+    },
+    "village": {
+      "code": "31.74.02.1006",
+      "name": "Pasar Manggis"
+    }
+  }
+]
+```
+
+### Administrative Levels
+
+Get results at different administrative levels:
+
+<CodeGroup>
+  ```bash Province level
+  geocoder geocode --coords="-6.2088 106.8456" --level=province
+  ```
+
+  ```bash Regency level
+  geocoder geocode --coords="-6.2088 106.8456" --level=regency
+  ```
+
+  ```bash District level
+  geocoder geocode --coords="-6.2088 106.8456" --level=district
+  ```
+
+  ```bash Village level (default)
+  geocoder geocode --coords="-6.2088 106.8456" --level=village
+  ```
+</CodeGroup>
+
+<Info>
+  Lower administrative levels automatically include all higher level data. For example, `--level=district` returns province, regency, and district information.
+</Info>
+
+### Debug Mode
+
+Enable detailed logging to troubleshoot issues:
+
+```bash
+geocoder geocode --coords="-6.2088 106.8456" --debug
+```
+
+Debug output is written to stderr and includes:
+- Timestamp for each operation
+- Database path and status
+- Coordinate parsing details
+- Query execution information
+- Result summary
+
+**Example debug output:**
+```
+2026-03-03 10:30:45.123 [DEBUG] Starting geocode process
+2026-03-03 10:30:45.124 [DEBUG] Database: /home/user/.geocoder-id/geocoder.db
+2026-03-03 10:30:45.125 [DEBUG] Level: village
+2026-03-03 10:30:45.126 [DEBUG] Output: table
+2026-03-03 10:30:45.127 [DEBUG] Parsing coordinates: -6.2088 106.8456
+2026-03-03 10:30:45.128 [DEBUG] Parsed 1 coordinate(s)
+2026-03-03 10:30:45.129 [DEBUG] Opening database...
+2026-03-03 10:30:45.150 [DEBUG] Database opened successfully
+2026-03-03 10:30:45.151 [DEBUG] Processing coordinate 1: lat=-6.208800, lon=106.845600
+2026-03-03 10:30:45.152 [DEBUG] Querying level: village
+2026-03-03 10:30:45.175 [DEBUG] Coordinate 1: found DKI Jakarta
+2026-03-03 10:30:45.176 [DEBUG] Geocoding complete, 1 result(s) found out of 1 coordinate(s)
+2026-03-03 10:30:45.177 [DEBUG] Done
+```
+
+### Custom Database Path
+
+Use a custom database file location:
+
+```bash
+geocoder geocode --coords="-6.2088 106.8456" --db=/custom/path/geocoder.db
+```
+
+<Warning>
+  When using a custom database path, ensure the file exists and is a valid Geocoder ID database. The auto-download feature only works with the default database location.
+</Warning>
+
+## Common Use Cases
+
+### Pipeline Integration
+
+Combine with other tools using JSON output:
+
+```bash
+geocoder geocode --coords="-6.2088 106.8456" --output=json | jq '.[] | .village.name'
+```
+
+### Batch Processing
+
+Process coordinates from a file:
+
+```bash
+# Create coordinates from a file (one per line in "lat lon" format)
+coords=$(paste -sd ";" coordinates.txt)
+geocoder geocode --coords="$coords" --output=json > results.json
+```
+
+### Quick Province Lookup
+
+Get just the province for fast lookups:
+
+```bash
+geocoder geocode --coords="-6.2088 106.8456" --level=province --output=json
+```
+
+## Error Handling
+
+The CLI exits with status code 1 on errors:
+
+- **Invalid coordinates format**: Check that coordinates use "lat lon" format with proper spacing
+- **Database not found**: Ensure internet connection for first-time auto-download
+- **No results**: Coordinates may be outside Indonesia or in areas without coverage
+
+Use `--debug` flag to see detailed error information.

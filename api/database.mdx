@@ -1,0 +1,373 @@
+---
+title: 'Database'
+description: 'Database configuration, auto-download, and search paths'
+---
+
+## Overview
+
+Geocoder ID uses a DuckDB database with spatial extensions to perform fast reverse geocoding queries. The library provides flexible database configuration with automatic discovery and optional auto-download.
+
+---
+
+## Database Search Paths
+
+When using `NewDefault()`, the library searches for the database file in the following locations (in order):
+
+### 1. Environment Variable
+
+<ParamField path="GEOCODER_DB_PATH" type="string">
+  Custom database path set via environment variable. This takes highest priority.
+</ParamField>
+
+```bash
+export GEOCODER_DB_PATH="/custom/path/geocoder.duckdb"
+```
+
+### 2. Current Directory
+
+```
+./geocoder.duckdb
+```
+
+The working directory where your application runs.
+
+### 3. Data Subdirectory
+
+```
+./data/geocoder.duckdb
+```
+
+Useful for keeping data files organized in a `data/` folder.
+
+### 4. Executable Directory
+
+```
+/path/to/executable/geocoder.duckdb
+/path/to/executable/data/geocoder.duckdb
+```
+
+The directory containing your compiled binary and its `data/` subdirectory.
+
+### 5. User Home Directory
+
+```
+~/.geocoder-id/geocoder.duckdb
+```
+
+The default location for auto-downloaded databases.
+
+<CodeGroup>
+```go Using Custom Path
+// Option 1: Environment variable
+os.Setenv("GEOCODER_DB_PATH", "/custom/path/geocoder.duckdb")
+geocoder, err := geocoder.NewDefault()
+
+// Option 2: Direct path
+geocoder, err := geocoder.New("/custom/path/geocoder.duckdb")
+```
+
+```bash Environment Variable
+# Set in shell
+export GEOCODER_DB_PATH="/opt/geocoder/geocoder.duckdb"
+
+# Run your application
+./myapp
+```
+
+```go Search Logic
+// Simplified version of findDatabase()
+func findDatabase() (string, error) {
+    candidates := []string{}
+    
+    // 1. Environment variable (highest priority)
+    if envPath := os.Getenv("GEOCODER_DB_PATH"); envPath != "" {
+        candidates = append(candidates, envPath)
+    }
+    
+    // 2. Current directory
+    candidates = append(candidates, "geocoder.duckdb")
+    
+    // 3. Data subdirectory
+    candidates = append(candidates, "data/geocoder.duckdb")
+    
+    // 4. Executable directory
+    if exe, err := os.Executable(); err == nil {
+        exeDir := filepath.Dir(exe)
+        candidates = append(candidates, 
+            filepath.Join(exeDir, "geocoder.duckdb"),
+            filepath.Join(exeDir, "data", "geocoder.duckdb"))
+    }
+    
+    // 5. User home directory
+    if home, err := os.UserHomeDir(); err == nil {
+        candidates = append(candidates, 
+            filepath.Join(home, ".geocoder-id", "geocoder.duckdb"))
+    }
+    
+    // Check each candidate
+    for _, path := range candidates {
+        if _, err := os.Stat(path); err == nil {
+            return path, nil
+        }
+    }
+    
+    return "", fmt.Errorf("database not found")
+}
+```
+</CodeGroup>
+
+<Note>
+The first database file found in the search order is used. Place your database file in any of these locations, or set `GEOCODER_DB_PATH` for custom locations.
+</Note>
+
+---
+
+## Auto-Download Behavior
+
+If no database is found in the search paths, `NewDefault()` automatically downloads the database from GitHub releases.
+
+### Download URL Pattern
+
+```go
+const dbDownloadURL = "https://github.com/zsbahtiar/geocoder-id/releases/download/v%s/geocoder.duckdb"
+```
+
+The download URL is constructed using the library version:
+
+- **Production builds**: Uses the actual version (e.g., `v0.1.2`)
+- **Development builds**: Falls back to the latest stable version
+
+<CodeGroup>
+```go Version Handling
+const latestVersion = "0.1.2"
+var Version = "dev"  // Set by build flags
+
+func downloadDatabase(destPath string) error {
+    version := Version
+    if version == "dev" || version == "" {
+        version = latestVersion
+    }
+    
+    url := fmt.Sprintf(dbDownloadURL, version)
+    // Downloads from:
+    // https://github.com/zsbahtiar/geocoder-id/releases/download/v0.1.2/geocoder.duckdb
+    
+    // ... download logic
+}
+```
+</CodeGroup>
+
+### Download Location
+
+Auto-downloaded databases are saved to:
+
+```
+~/.geocoder-id/geocoder.duckdb
+```
+
+This location is automatically created if it doesn't exist.
+
+<CodeGroup>
+```go Auto-Download Flow
+geocoder, err := geocoder.NewDefault()
+// 1. Searches all paths via findDatabase()
+// 2. If not found, calls autoDownloadDatabase()
+// 3. Downloads to ~/.geocoder-id/geocoder.duckdb
+// 4. Creates Geocoder instance with downloaded DB
+```
+
+```bash Download Output
+Downloading database from https://github.com/zsbahtiar/geocoder-id/releases/download/v0.1.2/geocoder.duckdb...
+Downloaded 45 MB to /home/user/.geocoder-id/geocoder.duckdb
+```
+</CodeGroup>
+
+<Warning>
+Auto-download requires internet connectivity and may take time depending on connection speed. For production deployments, consider bundling the database with your application or downloading it during build/deployment.
+</Warning>
+
+---
+
+## Database File Details
+
+### Format
+
+- **Database Engine**: DuckDB (embedded analytical database)
+- **Required Extension**: Spatial extension (automatically loaded)
+- **Access Mode**: Read-only
+- **File Size**: ~45-50 MB (compressed with spatial indexes)
+
+### Contents
+
+The database contains two main tables:
+
+1. **locations** - Geometric boundaries for all administrative levels
+   - Columns: `code`, `level`, `geom` (geometry)
+   - Indexed for fast spatial queries
+
+2. **hierarchy** - Administrative hierarchy and names
+   - Columns: `code`, `province_code`, `province_name`, `regency_code`, `regency_name`, `district_code`, `district_name`, `village_code`, `village_name`
+   - Joined with locations for complete results
+
+<CodeGroup>
+```sql Database Schema
+-- Simplified query used by ReverseGeocodeLevel
+SELECT h.province_code, h.province_name,
+       h.regency_code, h.regency_name,
+       h.district_code, h.district_name,
+       h.village_code, h.village_name
+FROM locations l
+JOIN hierarchy h ON l.code = h.code
+WHERE ST_Contains(l.geom, ST_Point(?, ?))
+  AND l.level = ?
+LIMIT 1
+```
+</CodeGroup>
+
+---
+
+## Production Deployment
+
+### Option 1: Bundle Database
+
+Include the database file in your application package:
+
+```bash
+# Download once during build
+curl -L -o data/geocoder.duckdb \
+  https://github.com/zsbahtiar/geocoder-id/releases/download/v0.1.2/geocoder.duckdb
+
+# Package with application
+tar czf myapp.tar.gz myapp data/
+```
+
+### Option 2: Pre-download in Container
+
+```dockerfile
+FROM golang:1.21-alpine
+
+# Download database during image build
+RUN mkdir -p /app/data && \
+    wget -O /app/data/geocoder.duckdb \
+    https://github.com/zsbahtiar/geocoder-id/releases/download/v0.1.2/geocoder.duckdb
+
+COPY myapp /app/
+WORKDIR /app
+CMD ["./myapp"]
+```
+
+### Option 3: Environment Variable
+
+```bash
+# Download to shared location
+curl -L -o /opt/geocoder/geocoder.duckdb \
+  https://github.com/zsbahtiar/geocoder-id/releases/download/v0.1.2/geocoder.duckdb
+
+# Set in application environment
+export GEOCODER_DB_PATH="/opt/geocoder/geocoder.duckdb"
+```
+
+### Option 4: Allow Auto-Download
+
+```go
+// Suitable for development or low-traffic applications
+geocoder, err := geocoder.NewDefault()
+if err != nil {
+    log.Fatal(err)
+}
+// First run will download to ~/.geocoder-id/
+// Subsequent runs will use cached database
+```
+
+<Note>
+For production environments with multiple instances or containers, bundling the database (Option 1 or 2) is recommended to avoid repeated downloads and ensure consistent startup times.
+</Note>
+
+---
+
+## Database Updates
+
+Database updates are released as new versions on GitHub. To update:
+
+1. Check for new releases: https://github.com/zsbahtiar/geocoder-id/releases
+2. Download the latest `geocoder.duckdb` file
+3. Replace your existing database file
+
+<CodeGroup>
+```bash Manual Update
+# Download latest version
+curl -L -o ~/.geocoder-id/geocoder.duckdb \
+  https://github.com/zsbahtiar/geocoder-id/releases/download/v0.1.2/geocoder.duckdb
+
+# Or update bundled version
+curl -L -o data/geocoder.duckdb \
+  https://github.com/zsbahtiar/geocoder-id/releases/download/v0.1.2/geocoder.duckdb
+```
+</CodeGroup>
+
+<Note>
+Database updates typically include:
+- Updated administrative boundaries from government sources
+- New villages/kelurahan from administrative changes
+- Corrections to codes and names
+- Performance improvements to spatial indexes
+</Note>
+
+---
+
+## Troubleshooting
+
+### Database Not Found Error
+
+```go
+geocoder, err := geocoder.NewDefault()
+// Error: database not found
+```
+
+**Solutions:**
+1. Set `GEOCODER_DB_PATH` environment variable
+2. Place `geocoder.duckdb` in `./data/` directory
+3. Ensure internet connectivity for auto-download
+4. Use `New()` with explicit path
+
+### Permission Errors
+
+```
+failed to open database: unable to open database file
+```
+
+**Solutions:**
+- Check file permissions (database needs read access)
+- Ensure directory permissions for auto-download location
+- Verify disk space for downloads
+
+### Spatial Extension Errors
+
+```
+failed to load spatial extension
+```
+
+**Solutions:**
+- Update to latest DuckDB version
+- Ensure DuckDB Go driver is properly installed
+- Check for conflicting DuckDB installations
+
+<CodeGroup>
+```go Error Handling
+geocoder, err := geocoder.NewDefault()
+if err != nil {
+    if strings.Contains(err.Error(), "database not found") {
+        // Handle missing database
+        log.Println("Database not found. Options:")
+        log.Println("1. Set GEOCODER_DB_PATH environment variable")
+        log.Println("2. Place database in ./data/ directory")
+        log.Println("3. Check internet connection for auto-download")
+    } else if strings.Contains(err.Error(), "failed to open") {
+        // Handle file access errors
+        log.Println("Cannot open database. Check file permissions.")
+    }
+    return err
+}
+defer geocoder.Close()
+```
+</CodeGroup>

@@ -1,0 +1,175 @@
+---
+title: Installation
+description: Install Geocoder ID as a Go library or standalone CLI tool
+---
+
+Geocoder ID can be used in two ways: as a Go library integrated into your application, or as a standalone CLI tool for quick lookups and testing.
+
+## Go Library
+
+<Steps>
+  <Step title="Install the package">
+    Add Geocoder ID to your Go project using `go get`:
+    
+    ```bash
+    go get github.com/zsbahtiar/geocoder-id
+    ```
+    
+    <Info>
+      Requires Go 1.25.5 or higher
+    </Info>
+  </Step>
+  
+  <Step title="Import in your code">
+    Import the package in your Go files:
+    
+    ```go
+    import geocoder "github.com/zsbahtiar/geocoder-id"
+    ```
+  </Step>
+  
+  <Step title="Initialize the geocoder">
+    Create a new geocoder instance. The database will be automatically downloaded on first use:
+    
+    ```go
+    gc, err := geocoder.NewDefault()
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer gc.Close()
+    ```
+    
+    <Note>
+      The database file (~50MB) will be downloaded to `~/.geocoder-id/geocoder.duckdb` on first initialization.
+    </Note>
+  </Step>
+</Steps>
+
+## CLI Tool
+
+The CLI tool is useful for quick lookups, testing, and shell scripting.
+
+<Steps>
+  <Step title="Download the binary">
+    Download the pre-built binary for your platform from the [releases page](https://github.com/zsbahtiar/geocoder-id/releases):
+    
+    <CodeGroup>
+    ```bash macOS (Apple Silicon)
+    curl -L https://github.com/zsbahtiar/geocoder-id/releases/latest/download/geocoder-darwin-arm64 -o geocoder
+    chmod +x geocoder
+    ```
+    
+    ```bash macOS (Intel)
+    curl -L https://github.com/zsbahtiar/geocoder-id/releases/latest/download/geocoder-darwin-amd64 -o geocoder
+    chmod +x geocoder
+    ```
+    
+    ```bash Linux (x86_64)
+    curl -L https://github.com/zsbahtiar/geocoder-id/releases/latest/download/geocoder-linux-amd64 -o geocoder
+    chmod +x geocoder
+    ```
+    
+    ```bash Windows (PowerShell)
+    Invoke-WebRequest -Uri "https://github.com/zsbahtiar/geocoder-id/releases/latest/download/geocoder-windows-amd64.exe" -OutFile "geocoder.exe"
+    ```
+    </CodeGroup>
+  </Step>
+  
+  <Step title="Move to PATH (optional)">
+    For easier access, move the binary to a directory in your PATH:
+    
+    <CodeGroup>
+    ```bash macOS/Linux
+    sudo mv geocoder /usr/local/bin/
+    ```
+    
+    ```bash Windows (PowerShell - Run as Admin)
+    Move-Item geocoder.exe C:\Windows\System32\
+    ```
+    </CodeGroup>
+  </Step>
+  
+  <Step title="Verify installation">
+    Test that the CLI is working:
+    
+    ```bash
+    geocoder --help
+    ```
+    
+    On first run, the database will be automatically downloaded.
+  </Step>
+</Steps>
+
+## Building from Source
+
+If you prefer to build from source:
+
+<Steps>
+  <Step title="Clone the repository">
+    ```bash
+    git clone https://github.com/zsbahtiar/geocoder-id
+    cd geocoder-id
+    ```
+  </Step>
+  
+  <Step title="Build the binary">
+    ```bash
+    make build
+    ```
+    
+    Or without Make:
+    
+    ```bash
+    go build -o geocoder ./cmd/geocoder
+    ```
+  </Step>
+  
+  <Step title="Run the binary">
+    ```bash
+    ./geocoder geocode --coords="-6.2088 106.8456"
+    ```
+  </Step>
+</Steps>
+
+## Database Configuration
+
+By default, Geocoder ID looks for the database in the following locations (in order):
+
+1. Path specified in `GEOCODER_DB_PATH` environment variable
+2. `./geocoder.duckdb` (current directory)
+3. `./data/geocoder.duckdb`
+4. Same directory as the executable
+5. `~/.geocoder-id/geocoder.duckdb` (user home directory)
+
+<Note>
+  If the database is not found in any of these locations, it will be automatically downloaded to `~/.geocoder-id/geocoder.duckdb`.
+</Note>
+
+### Custom Database Path
+
+You can specify a custom database path using the environment variable:
+
+<CodeGroup>
+```bash macOS/Linux
+export GEOCODER_DB_PATH="/path/to/custom/geocoder.duckdb"
+```
+
+```bash Windows (PowerShell)
+$env:GEOCODER_DB_PATH = "C:\path\to\custom\geocoder.duckdb"
+```
+
+```go Go Library
+// For programmatic use, initialize with a custom path
+gc, err := geocoder.New("/path/to/custom/geocoder.duckdb")
+if err != nil {
+    log.Fatal(err)
+}
+defer gc.Close()
+```
+</CodeGroup>
+
+## Next Steps
+
+<Card title="Quick Start Guide" icon="rocket" href="/quickstart">
+  Learn how to perform your first reverse geocoding query
+</Card>

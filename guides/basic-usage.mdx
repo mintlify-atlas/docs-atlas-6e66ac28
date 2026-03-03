@@ -1,0 +1,135 @@
+---
+title: 'Basic Usage'
+description: 'Learn how to perform reverse geocoding with Geocoder ID'
+---
+
+## Getting Started
+
+The most common use case for Geocoder ID is reverse geocoding - converting latitude/longitude coordinates into Indonesian administrative location names.
+
+## Creating a Geocoder Instance
+
+Use `NewDefault()` to automatically find or download the database:
+
+```go
+gc, err := geocoder.NewDefault()
+if err != nil {
+    log.Fatal(err)
+}
+defer gc.Close()
+```
+
+<Info>
+`NewDefault()` will automatically search for the database in common locations or download it if not found. Always remember to call `Close()` when done.
+</Info>
+
+## Basic Reverse Geocoding
+
+The `ReverseGeocode` function returns administrative location data for a coordinate:
+
+```go
+result := gc.ReverseGeocode(-6.2088, 106.8456)
+```
+
+<Note>
+Parameters are `latitude` and `longitude` in that order. This example uses coordinates for Jakarta, Indonesia.
+</Note>
+
+## Working with Results
+
+The `Result` type contains pointers to four administrative levels:
+
+```go
+type Result struct {
+    Province *Location `json:"province,omitempty"`
+    Regency  *Location `json:"regency,omitempty"`
+    District *Location `json:"district,omitempty"`
+    Village  *Location `json:"village,omitempty"`
+}
+
+type Location struct {
+    Code string `json:"code"`
+    Name string `json:"name"`
+}
+```
+
+### Accessing Result Data
+
+Always check for `nil` before accessing result fields:
+
+<CodeGroup>
+
+```go Complete Example
+package main
+
+import (
+    "fmt"
+    "log"
+
+    geocoder "github.com/zsbahtiar/geocoder-id"
+)
+
+func main() {
+    gc, err := geocoder.NewDefault()
+    if err != nil {
+        log.Fatal(err)
+    }
+    defer gc.Close()
+
+    result := gc.ReverseGeocode(-6.2088, 106.8456)
+
+    if result.Province != nil {
+        fmt.Printf("Province: %s (%s)\n", result.Province.Name, result.Province.Code)
+    }
+    if result.Regency != nil {
+        fmt.Printf("Regency:  %s (%s)\n", result.Regency.Name, result.Regency.Code)
+    }
+    if result.District != nil {
+        fmt.Printf("District: %s (%s)\n", result.District.Name, result.District.Code)
+    }
+    if result.Village != nil {
+        fmt.Printf("Village:  %s (%s)\n", result.Village.Name, result.Village.Code)
+    }
+}
+```
+
+```go Output
+Province: DKI JAKARTA (31)
+Regency:  KOTA JAKARTA PUSAT (3171)
+District: MENTENG (317104)
+Village:  MENTENG (3171041006)
+```
+
+</CodeGroup>
+
+## Custom Database Path
+
+If you need to specify a custom database location, use `New()`:
+
+```go
+gc, err := geocoder.New("/path/to/geocoder.duckdb")
+if err != nil {
+    log.Fatal(err)
+}
+defer gc.Close()
+```
+
+## Function Signatures
+
+```go
+// Create geocoder with auto-discovery/download
+func NewDefault() (*Geocoder, error)
+
+// Create geocoder with custom database path
+func New(dbPath string) (*Geocoder, error)
+
+// Reverse geocode at village level (most detailed)
+func (g *Geocoder) ReverseGeocode(lat, lon float64) Result
+
+// Close the database connection
+func (g *Geocoder) Close() error
+```
+
+<Warning>
+Always call `Close()` on the geocoder when you're done to properly release database resources. Use `defer` immediately after creating the instance.
+</Warning>
